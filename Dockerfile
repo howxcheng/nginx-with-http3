@@ -4,7 +4,7 @@ LABEL org.opencontainers.image.source="https://github.com/howxcheng/nginx-with-s
 ARG http_proxy
 ARG https_proxy
 RUN apk add nginx python3 py3-yaml py3-requests
-RUN sed -i 's/return 404;/root \/app\/html;/g' /etc/nginx/http.d/default.conf
+RUN sed -i 's/return 404;/root \/apps\/html;/g' /etc/nginx/http.d/default.conf
 RUN sed -i 's/80/35808/g' /etc/nginx/http.d/default.conf
 
 VOLUME [ "/apps" ]
