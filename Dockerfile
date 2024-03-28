@@ -9,7 +9,6 @@ RUN sed -i 's/80/35808/g' /etc/nginx/http.d/default.conf
 
 VOLUME [ "/apps" ]
 WORKDIR /apps
-COPY apps /apps
 RUN echo "0 */8 * * * /bin/ash /apps/run.sh" >>/etc/crontabs/root
 
 COPY entrypoint.sh /entrypoint.sh
