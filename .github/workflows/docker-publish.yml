@@ -2,7 +2,7 @@ name: Deploy Images to GHCR
 
 env:
   REGISTRY: ghcr.io
-  IMAGE: howxcheng/nginx-with-script
+  IMAGE: howxcheng/nginx-with-http3
 
 on:
   # push:
