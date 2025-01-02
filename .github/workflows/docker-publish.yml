@@ -42,6 +42,8 @@ jobs:
 
       - name: Push Docker image
         run: |
+          # 获取当前日期
+          TAG_DATE=$(date +'%Y-%m-%d')
           # 推送镜像到 Docker Hub
           docker push howxcheng/nginx_with_http3:$TAG_DATE
           docker push howxcheng/nginx_with_http3:latest
