@@ -32,11 +32,9 @@ RUN git clone https://github.com/nginx/nginx.git . && \
 FROM ubuntu:24.04
 
 # 安装运行 Nginx 所需的最小依赖
-RUN apt-get update && apt-get install -y \
-    libssl3t64 \
-    libpcre3 \
-    zlib1g \
-    ca-certificates
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends libssl3t64 libpcre3 zlib1g ca-certificates && \
+    rm -rf /var/lib/apt/lists/*
 
 # 从构建阶段复制编译好的 Nginx 文件
 COPY --from=builder /usr/local/nginx /usr/local/nginx
