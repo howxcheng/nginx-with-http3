@@ -31,7 +31,7 @@ jobs:
           # 获取当前日期
           TAG_DATE=$(date +'%Y-%m-%d')
           # 设置镜像名称
-          IMAGE_NAME=howxcheng/nginx_with_http3
+          IMAGE_NAME=howxcheng/nginx-with-http3
 
           # 构建镜像并推送
           docker buildx build \
