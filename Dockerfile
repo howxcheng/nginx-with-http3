@@ -12,16 +12,16 @@ ENV BORINGSSL_VERSION 0.20250311.0
 RUN apt-get update && \
     apt-get install -y \
     build-essential \
-    git \
-    cmake \
-    golang \
-    ninja-build \
-    llvm \
     clang \
+    cmake \
+    git \
+    golang \
     libpcre2-dev \
-    zlib1g-dev \
     libbrotli-dev \
-    libunwind-dev && \
+    libunwind-dev \
+    llvm \
+    ninja-build \
+    zlib1g-dev && \
     rm -rf /var/lib/apt/lists/*
 
 # 安装 BoringSSL
@@ -59,19 +59,19 @@ RUN git clone --single-branch --branch release-${NGINX_VERSION} https://github.c
     --group=nginx \
     --with-compat \
     --with-file-aio \
-    --with-http_slice_module \
+    --with-http_auth_request_module \
     --with-http_gunzip_module \
     --with-http_gzip_static_module \
-    --with-http_auth_request_module \
+    --with-http_realip_module \
+    --with-http_slice_module \
+    --with-http_ssl_module \
+    --with-http_v2_module \
+    --with-http_v3_module \
+    --with-pcre-jit \
     --with-stream \
     --with-stream_realip_module \
     --with-stream_ssl_module \
     --with-stream_ssl_preread_module \
-    --with-http_ssl_module \
-    --with-http_v2_module \
-    --with-http_v3_module \
-    --with-http_realip_module \
-    --with-pcre-jit \
     --with-threads \
     --with-cc-opt='-g -O2' \
     --add-module=${BROTLI} && \
@@ -87,16 +87,17 @@ RUN apt-get update && \
     rm -rf /var/lib/apt/lists/*
 
 # 从构建阶段复制编译好的 Nginx 文件
-COPY --from=builder /usr/lib/libcrypto.so /usr/lib/libcrypto.so  
+COPY --from=builder /usr/lib/libcrypto.so /usr/lib/libcrypto.so
 COPY --from=builder /usr/lib/libssl.so /usr/lib/libssl.so
 COPY --from=builder /usr/include/openssl/ /usr/include/openssl/
 COPY --from=builder /etc/nginx /etc/nginx
 COPY --from=builder /usr/sbin/nginx /usr/sbin/nginx
 
 # 创建 Nginx 用户和组并调整 Nginx 目录权限
-RUN groupadd -g 1000 nginx && useradd -g users -u 1000 nginx -s /sbin/nologin && \
+RUN groupadd -g 1000 nginx && \
+    useradd -g users -u 1000 nginx -s /sbin/nologin && \
     mkdir -p /var/log/nginx && \
-    chown -R nginx:nginx /var/log/nginx \
+    chown -R nginx:nginx /var/log/nginx && \
     mkdir -p /var/cache/nginx && \
     chown -R nginx:nginx /var/cache/nginx 
 
