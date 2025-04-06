@@ -28,14 +28,11 @@ jobs:
 
       - name: Build and Push Docker image
         run: |
-          # 获取当前日期
-          TAG_DATE=$(date +'%Y-%m-%d')
           # 设置镜像名称
           IMAGE_NAME=howxcheng/nginx-with-http3
 
           # 构建镜像并推送
           docker buildx build \
             --platform linux/amd64,linux/arm64 \
-            -t $IMAGE_NAME:$TAG_DATE \
             -t $IMAGE_NAME:latest \
             --push .
