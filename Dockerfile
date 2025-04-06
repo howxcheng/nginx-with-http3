@@ -2,27 +2,42 @@
 FROM debian:stable-slim AS builder
 
 # 设置构建环境变量
-ENV QUICTLS /usr/src/quictls
 ENV BROTLI /usr/src/ngx_brotli
 ENV NGINX /usr/src/nginx
 ENV NGINX_VERSION 1.26.3
+ENV BORINGSSL /usr/src/boringssl
+ENV BORINGSSL_VERSION 0.20250311.0
 
 # 安装构建依赖
 RUN apt-get update && \
     apt-get install -y \
     build-essential \
+    clang \
     cmake \
     git \
+    golang \
     libpcre2-dev \
     libbrotli-dev \
+    libunwind-dev \
+    llvm \
+    ninja-build \
     zlib1g-dev && \
     rm -rf /var/lib/apt/lists/*
 
-# 安装 QuicTLS
-RUN git clone --single-branch https://github.com/quictls/quictls ${QUICTLS} 
+# 安装 BoringSSL
+RUN git clone --single-branch --branch ${BORINGSSL_VERSION} https://boringssl.googlesource.com/boringssl $BORINGSSL && \
+    cd ${BORINGSSL} && \
+    cmake -GNinja -B build -DCMAKE_BUILD_TYPE=Release \
+    -DBUILD_SHARED_LIBS=ON \
+    -DCMAKE_C_COMPILER=clang \
+    -DCMAKE_CXX_COMPILER=clang++ && \
+    ninja -C build && \
+    cp -f ${BORINGSSL}/build/crypto/libcrypto.* /usr/lib/ && \
+    cp -f ${BORINGSSL}/build/ssl/libssl.* /usr/lib/ && \
+    cp -rf ${BORINGSSL}/include/openssl /usr/include/openssl
 
 # 安装 Brotli
-RUN git clone --single-branch --recurse-submodules https://github.com/google/ngx_brotli.git ${BROTLI}
+RUN git clone --single-branch --recurse-submodules https://github.com/google/ngx_brotli.git $BROTLI
 
 # 获取并编译 Nginx
 RUN git clone --single-branch --branch release-${NGINX_VERSION} https://github.com/nginx/nginx ${NGINX} && \
@@ -52,13 +67,13 @@ RUN git clone --single-branch --branch release-${NGINX_VERSION} https://github.c
     --with-http_ssl_module \
     --with-http_v2_module \
     --with-http_v3_module \
+    --with-pcre-jit \
     --with-stream \
     --with-stream_realip_module \
     --with-stream_ssl_module \
     --with-stream_ssl_preread_module \
     --with-threads \
     --with-cc-opt='-g -O2' \
-    --with-openssl=${QUICTLS} \
     --add-module=${BROTLI} && \
     make && \
     make install
@@ -72,6 +87,9 @@ RUN apt-get update && \
     rm -rf /var/lib/apt/lists/*
 
 # 从构建阶段复制编译好的 Nginx 文件
+COPY --from=builder /usr/lib/libcrypto.so /usr/lib/libcrypto.so
+COPY --from=builder /usr/lib/libssl.so /usr/lib/libssl.so
+COPY --from=builder /usr/include/openssl/ /usr/include/openssl/
 COPY --from=builder /etc/nginx /etc/nginx
 COPY --from=builder /usr/sbin/nginx /usr/sbin/nginx
 
@@ -82,8 +100,7 @@ RUN groupadd -g 1000 nginx && \
     chown -R nginx:nginx /var/log/nginx && \
     mkdir -p /var/cache/nginx && \
     chown -R nginx:nginx /var/cache/nginx && \
-    mkdir -p /var/www && \
-    mv /etc/nginx/html /var/www/html && \
+    mkdir -p /var/www/html && \
     chown -R nginx:nginx /var/www/html
 
 # 暴露端口
