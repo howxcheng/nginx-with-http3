@@ -2,46 +2,30 @@
 FROM debian:stable-slim AS builder
 
 # 设置构建环境变量
-ENV BROTLI /usr/src/ngx_brotli
-ENV NGINX /usr/src/nginx
+ENV BROTLI_SOURCE /usr/src/ngx_brotli
+ENV NGINX_SOURCE /usr/src/nginx
 ENV NGINX_VERSION 1.26.3
-ENV BORINGSSL /usr/src/boringssl
-ENV BORINGSSL_VERSION 0.20250311.0
+ENV OPENSSL_SOURCE /usr/src/openssl
+ENV OPENSSL_VERSION 3.5.0
 
 # 安装构建依赖
 RUN apt-get update && \
     apt-get install -y \
     build-essential \
-    clang \
     cmake \
     git \
-    golang \
     libpcre2-dev \
     libbrotli-dev \
-    libunwind-dev \
-    llvm \
-    ninja-build \
     zlib1g-dev && \
     rm -rf /var/lib/apt/lists/*
 
-# 安装 BoringSSL
-RUN git clone --single-branch --branch ${BORINGSSL_VERSION} https://boringssl.googlesource.com/boringssl $BORINGSSL && \
-    cd ${BORINGSSL} && \
-    cmake -GNinja -B build -DCMAKE_BUILD_TYPE=Release \
-    -DBUILD_SHARED_LIBS=ON \
-    -DCMAKE_C_COMPILER=clang \
-    -DCMAKE_CXX_COMPILER=clang++ && \
-    ninja -C build && \
-    cp -f ${BORINGSSL}/build/crypto/libcrypto.* /usr/lib/ && \
-    cp -f ${BORINGSSL}/build/ssl/libssl.* /usr/lib/ && \
-    cp -rf ${BORINGSSL}/include/openssl /usr/include/openssl
-
-# 安装 Brotli
-RUN git clone --single-branch --recurse-submodules https://github.com/google/ngx_brotli.git $BROTLI
-
-# 获取并编译 Nginx
-RUN git clone --single-branch --branch release-${NGINX_VERSION} https://github.com/nginx/nginx ${NGINX} && \
-    cd ${NGINX} && \
+RUN git clone --single-branch --branch openssl-${OPENSSL_VERSION} https://github.com/openssl/openssl.git ${OPENSSL_SOURCE} && \
+    # 安装 OPENSSL
+    git clone --single-branch --recurse-submodules https://github.com/google/ngx_brotli.git ${BROTLI_SOURCE} && \
+    # 安装 Brotli
+    git clone --single-branch --branch release-${NGINX_VERSION} https://github.com/nginx/nginx.git ${NGINX_SOURCE} && \
+    # 获取并编译 Nginx
+    cd ${NGINX_SOURCE} && \
     ./auto/configure \
     --prefix=/etc/nginx \
     --sbin-path=/usr/sbin/nginx \
@@ -74,7 +58,8 @@ RUN git clone --single-branch --branch release-${NGINX_VERSION} https://github.c
     --with-stream_ssl_preread_module \
     --with-threads \
     --with-cc-opt='-g -O2' \
-    --add-module=${BROTLI} && \
+    --with-openssl=${OPENSSL_SOURCE} \
+    --add-module=${BROTLI_SOURCE} && \
     make && \
     make install
 
@@ -87,9 +72,6 @@ RUN apt-get update && \
     rm -rf /var/lib/apt/lists/*
 
 # 从构建阶段复制编译好的 Nginx 文件
-COPY --from=builder /usr/lib/libcrypto.so /usr/lib/libcrypto.so
-COPY --from=builder /usr/lib/libssl.so /usr/lib/libssl.so
-COPY --from=builder /usr/include/openssl/ /usr/include/openssl/
 COPY --from=builder /etc/nginx /etc/nginx
 COPY --from=builder /usr/sbin/nginx /usr/sbin/nginx
 
