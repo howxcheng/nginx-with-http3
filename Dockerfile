@@ -2,11 +2,11 @@
 FROM debian:stable-slim AS builder
 
 # 设置构建环境变量
-ENV BROTLI_SOURCE /usr/src/ngx_brotli
-ENV NGINX_SOURCE /usr/src/nginx
-ENV NGINX_VERSION 1.26.3
-ENV OPENSSL_SOURCE /usr/src/openssl
-ENV OPENSSL_VERSION 3.5.0
+ENV BROTLI_SOURCE=/usr/src/ngx_brotli
+ENV NGINX_SOURCE=/usr/src/nginx
+ENV NGINX_VERSION=1.26.3
+ENV OPENSSL_SOURCE=/usr/src/openssl
+ENV OPENSSL_VERSION=3.5.0
 
 # 安装构建依赖
 RUN apt-get update && \
@@ -60,7 +60,7 @@ RUN git clone --single-branch --branch openssl-${OPENSSL_VERSION} https://github
     --with-cc-opt='-g -O2' \
     --with-openssl=${OPENSSL_SOURCE} \
     --add-module=${BROTLI_SOURCE} && \
-    make && \
+    make -j$(nproc) && \
     make install
 
 # 第二阶段：运行阶段
