@@ -1,9 +1,0 @@
-services:
-  clash_updater:
-    image: ghcr.io/howxcheng/nginx-with-script:main
-    container_name: clash_updater
-    restart: always
-    ports:
-      - 80:35808
-    volumes:
-      - ./apps:/apps
