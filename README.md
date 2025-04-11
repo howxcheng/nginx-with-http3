@@ -7,7 +7,7 @@
 ```js
 ---
 services:
-  clash_updater:
+  nginx:
     image: howxcheng/nginx-with-http3:latest
     container_name: nginx
     cap_add:
