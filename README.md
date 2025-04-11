@@ -73,10 +73,10 @@ http {
         listen 443 ssl reuseport default_server;
         # HTTP/3 & QUIC 监听
         listen 443 quic reuseport default_server;
+        # 服务器域名
+        server_name www.showmeyoursite.com;
         # 响应头添加HTTP3支持声明
         add_header Alt-Svc 'h3=":443"; ma=86400'; # http3 1天缓存
-
-        server_name www.showmeyoursite.com; # 服务器域名
 
         location / {
             root /var/www/html;
@@ -97,14 +97,16 @@ server {
     listen 443 ssl;
     # HTTP/3 & QUIC 监听
     listen 443 quic;
+    # 服务器域名
+    server_name proxy1.showmeyoursite.com;
+    # 响应头添加HTTP3支持声明
+    add_header Alt-Svc 'h3=":443"; ma=86400'; # http3 1天缓存
+
     location / {
         # 基础代理设置
-        server_name proxy1.showmeyoursite.com;
         proxy_pass http://test_backend;
-        # 响应头添加HTTP3支持声明
-        add_header Alt-Svc 'h3=":443"; ma=86400'; # http3 1天缓存
-
         proxy_http_version 1.1;
+
         # 头部转发配置
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
