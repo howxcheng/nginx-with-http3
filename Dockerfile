@@ -10,6 +10,7 @@ ENV OPENSSL_VERSION=3.5.0
 
 # 安装构建依赖
 RUN apt-get update && \
+    apt-get full-upgrade -y && \
     apt-get install -y \
     build-essential \
     cmake \
@@ -68,6 +69,7 @@ FROM debian:stable-slim
 
 # 安装运行 Nginx 所需的最小依赖
 RUN apt-get update && \
+    apt-get full-upgrade -y && \
     apt-get install -y --no-install-recommends libbrotli1 && \
     rm -rf /var/lib/apt/lists/*
 
