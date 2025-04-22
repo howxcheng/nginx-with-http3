@@ -88,8 +88,10 @@ FROM debian:stable-slim
 # 安装运行 Nginx 所需的最小依赖
 RUN apt-get update && \
     apt-get full-upgrade -y && \
-    apt-get install -y --no-install-recommends libbrotli1 && \
+    apt-get install -y --no-install-recommends libbrotli1 supervisor cron && \
     rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
 
 # 从构建阶段复制编译好的 Nginx 文件
 COPY --from=builder /etc/nginx /etc/nginx
@@ -107,8 +109,16 @@ RUN groupadd -g 1000 nginx && \
     mkdir -p /var/www/html && \
     chown -R nginx:nginx /var/www/html
 
+# 复制配置文件和脚本
+COPY entrypoint.sh /app/entrypoint.sh
+COPY supervisord.conf /etc/supervisor/conf.d/supervisord.conf
+
+RUN chmod +x /app/entrypoint.sh && \
+    echo "" > /etc/crontab && \
+    chmod 644 /etc/crontab
+
 # 暴露端口
 EXPOSE 80 443
 
-# 启动 Nginx
-CMD ["nginx", "-g", "daemon off;"]
+# 启动
+ENTRYPOINT [ "/app/entrypoint.sh" ]
