@@ -4,9 +4,10 @@ FROM debian:stable-slim AS builder
 # 设置构建环境变量
 ENV BROTLI_SOURCE=/usr/src/ngx_brotli
 ENV NGINX_SOURCE=/usr/src/nginx
-ENV NGINX_VERSION=1.27.4
+ENV NGINX_VERSION=1.28.0
 ENV BORINGSSL_SOURCE=/usr/src/boringssl
-ENV BORINGSSL_VERSION=0.20250311.0
+ENV BORINGSSL_VERSION=0.20250415.0
+ENV NGINX_DAV_SOURCE=/usr/src/nginx-dav-ext-module
 
 # 安装构建依赖
 RUN apt-get update && \
@@ -22,6 +23,8 @@ RUN apt-get update && \
     libpcre2-dev \
     libbrotli-dev \
     libunwind-dev \
+    libxml2-dev \
+    libxslt1-dev \
     zlib1g-dev && \
     rm -rf /var/lib/apt/lists/*
 
@@ -42,6 +45,9 @@ RUN git clone --single-branch --branch ${BORINGSSL_VERSION} https://github.com/g
 # 安装 Brotli
 RUN git clone --single-branch https://github.com/google/ngx_brotli.git ${BROTLI_SOURCE} && \
     git clone --single-branch https://github.com/google/brotli.git ${BROTLI_SOURCE}/deps/brotli
+
+# 安装 Dav extension
+RUN git clone --single-branch https://github.com/arut/nginx-dav-ext-module.git ${NGINX_DAV_SOURCE}
 
 # 获取并编译 Nginx
 RUN git clone --single-branch --branch release-${NGINX_VERSION} https://github.com/nginx/nginx.git ${NGINX_SOURCE} && \
@@ -64,6 +70,7 @@ RUN git clone --single-branch --branch release-${NGINX_VERSION} https://github.c
     --with-compat \
     --with-file-aio \
     --with-http_auth_request_module \
+    --with-http_dav_module \
     --with-http_gunzip_module \
     --with-http_gzip_static_module \
     --with-http_realip_module \
@@ -78,7 +85,8 @@ RUN git clone --single-branch --branch release-${NGINX_VERSION} https://github.c
     --with-stream_ssl_preread_module \
     --with-threads \
     --with-cc-opt='-g -O2' \
-    --add-module=${BROTLI_SOURCE} && \
+    --add-module=${BROTLI_SOURCE} \
+    --add-module=${NGINX_DAV_SOURCE} && \
     make -j$(nproc) && \
     make install
 
@@ -88,7 +96,7 @@ FROM debian:stable-slim
 # 安装运行 Nginx 所需的最小依赖
 RUN apt-get update && \
     apt-get full-upgrade -y && \
-    apt-get install -y --no-install-recommends libbrotli1 supervisor cron && \
+    apt-get install -y --no-install-recommends cron libbrotli1 libxml2 libxslt1.1 supervisor && \
     rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
