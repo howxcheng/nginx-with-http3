@@ -9,10 +9,11 @@ ARG NGINX_DAV_SOURCE=/usr/src/nginx-dav-ext-module
 ARG NGINX_VERSION=1.28.0
 ARG BORINGSSL_VERSION=0.20250415.0
 ARG S6_OVERLAY_VERSION=3.2.0.2
-ARG COMPATIBLE=v3
+ARG COMPATIBLE
 ARG TARGETARCH
 
 # 安装构建依赖
+# sed -i 's|deb.debian.org|mirrors.ustc.edu.cn|g' /etc/apt/sources.list.d/debian.sources && \
 RUN apt-get update && \
     apt-get full-upgrade -y && \
     apt-get install -y \
@@ -68,7 +69,7 @@ RUN git clone --single-branch https://github.com/google/ngx_brotli.git ${BROTLI_
 RUN git clone --single-branch https://github.com/arut/nginx-dav-ext-module.git ${NGINX_DAV_SOURCE}
 
 # 获取并编译 Nginx
-RUN if [ $COMPATIBLE == "v3" ];then CC_OPT="-O2 -march=native"; else CC_OPT="-O2"; fi && \
+RUN if [ "$COMPATIBLE" = "v3" ];then CC_OPT="-O2 -march=native"; else CC_OPT="-O2"; fi && \
     git clone --single-branch --branch release-${NGINX_VERSION} https://github.com/nginx/nginx.git ${NGINX_SOURCE} && \
     cd ${NGINX_SOURCE} && \
     ./auto/configure \
@@ -117,6 +118,7 @@ FROM debian:stable-slim
 ENV PATH=/command:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 
 # 安装运行 Nginx 所需的最小依赖
+# sed -i 's|deb.debian.org|mirrors.ustc.edu.cn|g' /etc/apt/sources.list.d/debian.sources && \
 RUN apt-get update && \
     apt-get full-upgrade -y && \
     apt-get install -y --no-install-recommends cron libbrotli1 libxml2 && \
