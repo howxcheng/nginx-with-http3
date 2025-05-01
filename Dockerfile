@@ -12,7 +12,8 @@ ARG S6_OVERLAY_VERSION=3.2.0.2
 ARG TARGETARCH
 
 # 安装构建依赖
-RUN apt-get update && \
+RUN if $DEV_BUILD; then sed -i 's|deb.debian.org|mirrors.ustc.edu.cn|g' /etc/apt/sources.list.d/debian.sources; fi && \
+    apt-get update && \
     apt-get full-upgrade -y && \
     apt-get install -y \
     build-essential \
@@ -46,7 +47,7 @@ RUN mkdir -p /s6-overlay && \
     rm -f /tmp/s6-overlay.tar.xz
 
 # 安装 BORINGSSL
-RUN git clone --single-branch --branch ${BORINGSSL_VERSION} https://github.com/google/boringssl.git ${BORINGSSL_SOURCE} && \
+RUN git clone --single-branch --branch ${BORINGSSL_VERSION} https://$(if $DEV_BUILD; then echo gh-proxy.com/;fi)github.com/google/boringssl.git ${BORINGSSL_SOURCE} && \
     cd ${BORINGSSL_SOURCE} && \
     cmake -GNinja \
     -B build \
@@ -60,14 +61,14 @@ RUN git clone --single-branch --branch ${BORINGSSL_VERSION} https://github.com/g
     cp -r ${BORINGSSL_SOURCE}/include/openssl /usr/include/openssl
 
 # 安装 Brotli
-RUN git clone --single-branch https://github.com/google/ngx_brotli.git ${BROTLI_SOURCE} && \
-    git clone --single-branch https://github.com/google/brotli.git ${BROTLI_SOURCE}/deps/brotli
+RUN git clone --single-branch https://$(if $DEV_BUILD; then echo gh-proxy.com/;fi)github.com/google/ngx_brotli.git ${BROTLI_SOURCE} && \
+    git clone --single-branch https://$(if $DEV_BUILD; then echo gh-proxy.com/;fi)github.com/google/brotli.git ${BROTLI_SOURCE}/deps/brotli
 
 # 安装 Dav extension
-RUN git clone --single-branch https://github.com/arut/nginx-dav-ext-module.git ${NGINX_DAV_SOURCE}
+RUN git clone --single-branch https://$(if $DEV_BUILD; then echo gh-proxy.com/;fi)github.com/arut/nginx-dav-ext-module.git ${NGINX_DAV_SOURCE}
 
 # 获取并编译 Nginx
-RUN git clone --single-branch --branch release-${NGINX_VERSION} https://github.com/nginx/nginx.git ${NGINX_SOURCE} && \
+RUN git clone --single-branch --branch release-${NGINX_VERSION} https://$(if $DEV_BUILD; then echo gh-proxy.com/;fi)github.com/nginx/nginx.git ${NGINX_SOURCE} && \
     cd ${NGINX_SOURCE} && \
     ./auto/configure \
     --prefix=/etc/nginx \
@@ -115,7 +116,8 @@ FROM debian:stable-slim
 ENV PATH=/command:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 
 # 安装运行 Nginx 所需的最小依赖
-RUN apt-get update && \
+RUN if $DEV_BUILD; then sed -i 's|deb.debian.org|mirrors.ustc.edu.cn|g' /etc/apt/sources.list.d/debian.sources; fi && \
+    apt-get update && \
     apt-get full-upgrade -y && \
     apt-get install -y --no-install-recommends cron libbrotli1 libxml2 && \
     rm -rf /var/lib/apt/lists/*
