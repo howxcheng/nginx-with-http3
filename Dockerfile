@@ -9,6 +9,7 @@ ARG NGINX_DAV_SOURCE=/usr/src/nginx-dav-ext-module
 ARG NGINX_VERSION=1.28.0
 ARG BORINGSSL_VERSION=0.20250415.0
 ARG S6_OVERLAY_VERSION=3.2.0.2
+ARG COMPATIBLE=v3
 ARG TARGETARCH
 
 # 安装构建依赖
@@ -67,7 +68,8 @@ RUN git clone --single-branch https://github.com/google/ngx_brotli.git ${BROTLI_
 RUN git clone --single-branch https://github.com/arut/nginx-dav-ext-module.git ${NGINX_DAV_SOURCE}
 
 # 获取并编译 Nginx
-RUN git clone --single-branch --branch release-${NGINX_VERSION} https://github.com/nginx/nginx.git ${NGINX_SOURCE} && \
+RUN if [ $COMPATIBLE == "v3" ];then CC_OPT="-O2 -march=native"; else CC_OPT="-O2"; fi && \
+    git clone --single-branch --branch release-${NGINX_VERSION} https://github.com/nginx/nginx.git ${NGINX_SOURCE} && \
     cd ${NGINX_SOURCE} && \
     ./auto/configure \
     --prefix=/etc/nginx \
@@ -101,7 +103,7 @@ RUN git clone --single-branch --branch release-${NGINX_VERSION} https://github.c
     --with-stream_ssl_module \
     --with-stream_ssl_preread_module \
     --with-threads \
-    --with-cc-opt='-O2 -march=native' \
+    --with-cc-opt="$CC_OPT" \
     --with-ld-opt="-Wl,-O1,--as-needed" \
     --add-module=${BROTLI_SOURCE} \
     --add-module=${NGINX_DAV_SOURCE} && \

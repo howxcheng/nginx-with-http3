@@ -43,3 +43,9 @@ jobs:
             --platform linux/amd64,linux/arm64 \
             -t $IMAGE_NAME:latest \
             --push .
+
+          docker buildx build \
+            --platform linux/amd64,linux/arm64 \
+            --build-arg COMPATIBLE=v2 \
+            -t $IMAGE_NAME:compatible \
+            --push .
