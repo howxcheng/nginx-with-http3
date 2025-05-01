@@ -1,6 +1,11 @@
-# nginx-with-http3
+## 项目地址： [github.com/howxcheng/nginx-with-http3](url:https://github.com/howxcheng/nginx-with-http3)
 
-支持 http3 的 nginx 镜像
+```
+latest:  默认镜像
+
+compatible:  不支持AVX2、SSE4等功能的旧型号(V2以下)的CPU
+```
+## 示例配置
 
 ### docker-compose.yaml 示例配置
 
@@ -20,7 +25,14 @@ services:
       - ./nginx.conf:/etc/nginx/nginx.conf
       - ./conf.d:/etc/nginx/conf.d
       - ./html:/var/www/html
+      - ./crontab:/etc/crontab  # 支持计划任务
     restart: always
+```
+
+### crontab 示例配置
+
+```js
+0 0 * * * nginx -s reload
 ```
 
 ### nginx.conf 示例配置
@@ -73,10 +85,10 @@ http {
         listen 443 ssl reuseport default_server;
         # HTTP/3 & QUIC 监听
         listen 443 quic reuseport default_server;
-        # 服务器域名
-        server_name www.showmeyoursite.com;
         # 响应头添加HTTP3支持声明
         add_header Alt-Svc 'h3=":443"; ma=86400'; # http3 1天缓存
+
+        server_name www.showmeyoursite.com; # 服务器域名
 
         location / {
             root /var/www/html;
@@ -97,16 +109,14 @@ server {
     listen 443 ssl;
     # HTTP/3 & QUIC 监听
     listen 443 quic;
-    # 服务器域名
-    server_name proxy1.showmeyoursite.com;
-    # 响应头添加HTTP3支持声明
-    add_header Alt-Svc 'h3=":443"; ma=86400'; # http3 1天缓存
-
     location / {
         # 基础代理设置
+        server_name proxy1.showmeyoursite.com;
         proxy_pass http://test_backend;
-        proxy_http_version 1.1;
+        # 响应头添加HTTP3支持声明
+        add_header Alt-Svc 'h3=":443"; ma=86400'; # http3 1天缓存
 
+        proxy_http_version 1.1;
         # 头部转发配置
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
@@ -122,4 +132,36 @@ server {
 upstream test_backend {
     server 127.0.0.1:8080;
 }
+```
+
+### webdav.conf 子配置文件示例
+
+```js
+server {
+        listen 8080;
+        server_name _;
+
+        auth_basic "Restricted";
+        auth_basic_user_file /etc/nginx/.htpasswd;
+        # .htpasswd 写入用户名和加密过的密码，并设置权限600
+
+        location / {
+            # DAV 根目录
+            root /var/www/webdav;
+            # 启用 WebDAV 方法
+            dav_methods PUT DELETE MKCOL COPY MOVE;
+            # 启用 WebDAV Extension方法
+            dav_ext_methods PROPFIND OPTIONS;
+            # 自动创建上传文件的中间目录
+            create_full_put_path on;
+            # 新建文件和目录的权限：所有者/组可读写，其他只读
+            dav_access user:rw group:rw all:r;
+
+            autoindex on;
+            client_max_body_size 0;
+
+            # 强制 Basic 认证
+            satisfy any;
+        }
+    }
 ```
