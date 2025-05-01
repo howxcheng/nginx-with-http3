@@ -2,15 +2,19 @@
 FROM debian:stable-slim AS builder
 
 # 设置构建环境变量
-ENV BROTLI_SOURCE=/usr/src/ngx_brotli
-ENV NGINX_SOURCE=/usr/src/nginx
-ENV NGINX_VERSION=1.28.0
-ENV BORINGSSL_SOURCE=/usr/src/boringssl
-ENV BORINGSSL_VERSION=0.20250415.0
-ENV NGINX_DAV_SOURCE=/usr/src/nginx-dav-ext-module
+ENV DEV_BUILD=false
+ARG BROTLI_SOURCE=/usr/src/ngx_brotli
+ARG NGINX_SOURCE=/usr/src/nginx
+ARG NGINX_VERSION=1.28.0
+ARG BORINGSSL_SOURCE=/usr/src/boringssl
+ARG BORINGSSL_VERSION=0.20250415.0
+ARG NGINX_DAV_SOURCE=/usr/src/nginx-dav-ext-module
+ARG S6_OVERLAY_VERSION=3.2.0.2
+ARG TARGETARCH
 
 # 安装构建依赖
-RUN apt-get update && \
+RUN if $DEV_BUILD; then sed -i 's|deb.debian.org|mirrors.ustc.edu.cn|g' /etc/apt/sources.list.d/debian.sources; fi && \
+    apt-get update && \
     apt-get full-upgrade -y && \
     apt-get install -y \
     build-essential \
@@ -25,11 +29,26 @@ RUN apt-get update && \
     libunwind-dev \
     libxml2-dev \
     libxslt1-dev \
+    xz-utils \
+    wget \
     zlib1g-dev && \
     rm -rf /var/lib/apt/lists/*
 
+RUN mkdir -p /s6-overlay && \
+    case "${TARGETARCH}" in \
+    amd64) S6_ARCH=x86_64 ;; \
+    arm64) S6_ARCH=aarch64 ;; \
+    *) echo "Unsupported arch ${TARGETARCH}" >&2; exit 1 ;; \
+    esac && \
+    wget -O /tmp/s6-overlay-noarch.tar.xz https://$(if $DEV_BUILD; then echo gh-proxy.com/;fi)github.com/just-containers/s6-overlay/releases/download/v${S6_OVERLAY_VERSION}/s6-overlay-noarch.tar.xz && \
+    wget -O /tmp/s6-overlay.tar.xz https://$(if $DEV_BUILD; then echo gh-proxy.com/;fi)github.com/just-containers/s6-overlay/releases/download/v${S6_OVERLAY_VERSION}/s6-overlay-${S6_ARCH}.tar.xz && \
+    tar -C /s6-overlay -Jxpf /tmp/s6-overlay-noarch.tar.xz && \
+    tar -C /s6-overlay -Jxpf /tmp/s6-overlay.tar.xz && \
+    rm -f /tmp/s6-overlay-noarch.tar.xz && \
+    rm -f /tmp/s6-overlay.tar.xz
+
 # 安装 BORINGSSL
-RUN git clone --single-branch --branch ${BORINGSSL_VERSION} https://github.com/google/boringssl.git ${BORINGSSL_SOURCE} && \
+RUN git clone --single-branch --branch ${BORINGSSL_VERSION} https://$(if $DEV_BUILD; then echo gh-proxy.com/;fi)github.com/google/boringssl.git ${BORINGSSL_SOURCE} && \
     cd ${BORINGSSL_SOURCE} && \
     cmake -GNinja \
     -B build \
@@ -43,14 +62,14 @@ RUN git clone --single-branch --branch ${BORINGSSL_VERSION} https://github.com/g
     cp -r ${BORINGSSL_SOURCE}/include/openssl /usr/include/openssl
 
 # 安装 Brotli
-RUN git clone --single-branch https://github.com/google/ngx_brotli.git ${BROTLI_SOURCE} && \
-    git clone --single-branch https://github.com/google/brotli.git ${BROTLI_SOURCE}/deps/brotli
+RUN git clone --single-branch https://$(if $DEV_BUILD; then echo gh-proxy.com/;fi)github.com/google/ngx_brotli.git ${BROTLI_SOURCE} && \
+    git clone --single-branch https://$(if $DEV_BUILD; then echo gh-proxy.com/;fi)github.com/google/brotli.git ${BROTLI_SOURCE}/deps/brotli
 
 # 安装 Dav extension
-RUN git clone --single-branch https://github.com/arut/nginx-dav-ext-module.git ${NGINX_DAV_SOURCE}
+RUN git clone --single-branch https://$(if $DEV_BUILD; then echo gh-proxy.com/;fi)github.com/arut/nginx-dav-ext-module.git ${NGINX_DAV_SOURCE}
 
 # 获取并编译 Nginx
-RUN git clone --single-branch --branch release-${NGINX_VERSION} https://github.com/nginx/nginx.git ${NGINX_SOURCE} && \
+RUN git clone --single-branch --branch release-${NGINX_VERSION} https://$(if $DEV_BUILD; then echo gh-proxy.com/;fi)github.com/nginx/nginx.git ${NGINX_SOURCE} && \
     cd ${NGINX_SOURCE} && \
     ./auto/configure \
     --prefix=/etc/nginx \
@@ -93,13 +112,20 @@ RUN git clone --single-branch --branch release-${NGINX_VERSION} https://github.c
 # 第二阶段：运行阶段
 FROM debian:stable-slim
 
+# 设置环境变量
+ENV PATH=/command:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+
 # 安装运行 Nginx 所需的最小依赖
-RUN apt-get update && \
+RUN if $DEV_BUILD; then sed -i 's|deb.debian.org|mirrors.ustc.edu.cn|g' /etc/apt/sources.list.d/debian.sources; fi && \
+    apt-get update && \
     apt-get full-upgrade -y && \
-    apt-get install -y --no-install-recommends cron libbrotli1 libxml2 libxslt1.1 supervisor && \
+    apt-get install -y --no-install-recommends cron libbrotli1 libxml2 && \
     rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
+
+# 安装 S6-Overlay
+COPY --from=builder /s6-overlay/ /
 
 # 从构建阶段复制编译好的 Nginx 文件
 COPY --from=builder /etc/nginx /etc/nginx
@@ -109,24 +135,22 @@ COPY --from=builder /usr/lib/libcrypto.so /usr/lib/libcrypto.so
 
 # 创建 Nginx 用户和组并调整 Nginx 目录权限
 RUN groupadd -g 1000 nginx && \
-    useradd -g users -u 1000 nginx -s /sbin/nologin && \
+    useradd -u 1000 -g nginx -s /sbin/nologin nginx && \
     mkdir -p /var/log/nginx && \
     chown -R nginx:nginx /var/log/nginx && \
     mkdir -p /var/cache/nginx && \
     chown -R nginx:nginx /var/cache/nginx && \
     mkdir -p /var/www/html && \
-    chown -R nginx:nginx /var/www/html
+    chown -R nginx:nginx /var/www/html && \
+    mkdir -p /run/service
 
-# 复制配置文件和脚本
-COPY entrypoint.sh /app/entrypoint.sh
-COPY supervisord.conf /etc/supervisor/conf.d/supervisord.conf
-
-RUN chmod +x /app/entrypoint.sh && \
-    echo "" > /etc/crontab && \
-    chmod 644 /etc/crontab
+# 创建服务配置
+RUN touch /etc/s6-overlay/s6-rc.d/user/contents.d/check && \
+    touch /etc/s6-overlay/s6-rc.d/user/contents.d/nginx && \
+    touch /etc/s6-overlay/s6-rc.d/user/contents.d/cron
+COPY s6-rc.d/ /etc/s6-overlay/s6-rc.d/
 
 # 暴露端口
 EXPOSE 80 443
 
-# 启动
-ENTRYPOINT [ "/app/entrypoint.sh" ]
+ENTRYPOINT [ "/init" ]
