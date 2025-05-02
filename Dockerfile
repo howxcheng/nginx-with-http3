@@ -10,7 +10,7 @@ ARG NGINX_VERSION=1.28.0
 ARG BORINGSSL_VERSION=0.20250415.0
 ARG S6_OVERLAY_VERSION=3.2.0.2
 ARG COMPATIBLE
-ARG S6_ARCH
+ARG TARGETARCH 
 
 # 安装构建依赖
 # sed -i 's|deb.debian.org|mirrors.ustc.edu.cn|g' /etc/apt/sources.list.d/debian.sources && \
@@ -56,7 +56,12 @@ RUN git clone --single-branch https://github.com/google/ngx_brotli.git ${BROTLI_
 RUN git clone --single-branch https://github.com/arut/nginx-dav-ext-module.git ${NGINX_DAV_SOURCE}
 
 # 安装 S6-Overlay
-RUN mkdir -p /s6-overlay && \
+RUN case "${TARGETARCH}" in \
+    amd64) S6_ARCH=x86_64 ;; \
+    arm64) S6_ARCH=aarch64 ;; \
+    *) echo "Unsupported arch ${TARGETARCH}" >&2; exit 1 ;; \
+    esac && \
+    mkdir -p /s6-overlay && \
     wget -O /tmp/s6-overlay-noarch.tar.xz https://github.com/just-containers/s6-overlay/releases/download/v${S6_OVERLAY_VERSION}/s6-overlay-noarch.tar.xz && \
     wget -O /tmp/s6-overlay.tar.xz https://github.com/just-containers/s6-overlay/releases/download/v${S6_OVERLAY_VERSION}/s6-overlay-${S6_ARCH}.tar.xz && \
     tar -C /s6-overlay -Jxpf /tmp/s6-overlay-noarch.tar.xz && \
@@ -65,7 +70,10 @@ RUN mkdir -p /s6-overlay && \
     rm -f /tmp/s6-overlay.tar.xz
 
 # 获取并编译 Nginx
-RUN if [ "$COMPATIBLE" = "v3" ];then CC_OPT="-O2 -march=native"; else CC_OPT="-O2"; fi && \
+RUN case "${COMPATIBLE}" in \
+    v3) CC_OPT="-O2 -march=native" ;; \
+    *) CC_OPT="-O2" ;; \
+    esac && \
     git clone --single-branch --branch release-${NGINX_VERSION} https://github.com/nginx/nginx.git ${NGINX_SOURCE} && \
     cd ${NGINX_SOURCE} && \
     ./auto/configure \

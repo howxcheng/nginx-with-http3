@@ -20,8 +20,11 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        platform: [linux/amd64, linux/arm64]
-        version: [v3, v2]
+        include:
+          - version: v3
+            push_tag: latest
+          - version: v2
+            push_tag: compatible
 
     steps:
       - name: Checkout repository
@@ -43,11 +46,10 @@ jobs:
         uses: docker/build-push-action@v6
         with:
           context: .
-          platforms: ${{ matrix.platform }}
+          platforms: linux/amd64, linux/arm64
           push: true
-          tags: howxcheng/nginx-with-http3:${{ matrix.version == 'v2' && 'compatible' || 'latest' }}
+          tags: howxcheng/nginx-with-http3:${{ matrix.push_tag }}
           build-args: |
-            S6_ARCH=${{ matrix.platform == 'linux/amd64' && 'x86_64' || 'aarch64' }}
             COMPATIBLE=${{ matrix.version }}
           cache-from: type=gha,scope=${{ matrix.version }}
           cache-to: type=gha,mode=max,scope=${{ matrix.version }}
