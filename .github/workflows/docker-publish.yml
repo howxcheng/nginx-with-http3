@@ -3,19 +3,25 @@ name: Build and Push Docker Image
 on:
   push:
     branches: ["main"]
-    paths:
-      - Dockerfile
-      - .github/workflows/docker-publish.yml
+    paths-ignore:
+      - .gitignore
+      - LICENSE
+      - README.md
 
   pull_request:
     branches: ["main"]
-    paths:
-      - Dockerfile
-      - .github/workflows/docker-publish.yml
+    paths-ignore:
+      - .gitignore
+      - LICENSE
+      - README.md
 
 jobs:
   build:
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        platform: [linux/amd64, linux/arm64]
+        version: [v3, v2]
 
     steps:
       - name: Checkout repository
@@ -33,54 +39,15 @@ jobs:
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_PASSWORD }}
 
-      - name: Build and Push Docker image for AMD64v3 CPU
+      - name: Build and push Docker image
         uses: docker/build-push-action@v6
         with:
           context: .
+          platforms: ${{ matrix.platform }}
           push: true
-          platforms: linux/amd64
-          tags: howxcheng/nginx-with-http3:latest
+          tags: howxcheng/nginx-with-http3:${{ matrix.version == 'v2' && 'compatible' || 'latest' }}
           build-args: |
-            COMPATIBLE=v3
-            S6_ARCH=x86_64
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-
-      - name: Build and Push Docker image for AMD64v2 CPU
-        uses: docker/build-push-action@v6
-        with:
-          context: .
-          push: true
-          platforms: linux/amd64,linux/arm64
-          tags: howxcheng/nginx-with-http3:compatible
-          build-args: |
-            COMPATIBLE=v2
-            S6_ARCH=x86_64
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-
-      - name: Build and Push Docker image for ARM64v3 CPU
-        uses: docker/build-push-action@v6
-        with:
-          context: .
-          push: true
-          platforms: linux/arm64
-          tags: howxcheng/nginx-with-http3:latest
-          build-args: |
-            COMPATIBLE=v3
-            S6_ARCH=aarch64
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-
-      - name: Build and Push Docker image for ARM64v2 CPU
-        uses: docker/build-push-action@v6
-        with:
-          context: .
-          push: true
-          platforms: linux/amd64,linux/arm64
-          tags: howxcheng/nginx-with-http3:compatible
-          build-args: |
-            COMPATIBLE=v2
-            S6_ARCH=aarch64
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+            S6_ARCH=${{ matrix.platform == 'linux/amd64' && 'x86_64' || 'aarch64' }}
+            COMPATIBLE=${{ matrix.version }}
+          cache-from: type=gha,scope=${{ matrix.version }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.version }}
