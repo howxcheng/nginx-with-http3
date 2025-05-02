@@ -18,14 +18,6 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        include:
-          - version: v3
-            push_tag: latest
-          - version: v2
-            push_tag: compatible
-
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -48,8 +40,6 @@ jobs:
           context: .
           platforms: linux/amd64, linux/arm64
           push: true
-          tags: howxcheng/nginx-with-http3:${{ matrix.push_tag }}
-          build-args: |
-            COMPATIBLE=${{ matrix.version }}
-          cache-from: type=gha,scope=${{ matrix.version }}
-          cache-to: type=gha,mode=max,scope=${{ matrix.version }}
+          tags: howxcheng/nginx-with-http3:latest
+          cache-from: type=gha,scope=nginx-with-http3
+          cache-to: type=gha,mode=max,scope=nginx-with-http3

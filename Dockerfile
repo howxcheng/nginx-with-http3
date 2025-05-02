@@ -2,18 +2,16 @@
 FROM debian:stable-slim AS builder
 
 # 设置构建环境变量
-ARG NGINX_SOURCE=/usr/src/nginx
-ARG BORINGSSL_SOURCE=/usr/src/boringssl
-ARG BROTLI_SOURCE=/usr/src/ngx_brotli
-ARG NGINX_DAV_SOURCE=/usr/src/nginx-dav-ext-module
-ARG NGINX_VERSION=1.28.0
-ARG BORINGSSL_VERSION=0.20250415.0
-ARG S6_OVERLAY_VERSION=3.2.0.2
-ARG COMPATIBLE
+ENV NGINX_SOURCE=/usr/src/nginx
+ENV BORINGSSL_SOURCE=/usr/src/boringssl
+ENV BROTLI_SOURCE=/usr/src/ngx_brotli
+ENV NGINX_DAV_SOURCE=/usr/src/nginx-dav-ext-module
+ENV NGINX_VERSION=1.28.0
+ENV BORINGSSL_VERSION=0.20250415.0
+ENV S6_OVERLAY_VERSION=3.2.0.2
 ARG TARGETARCH 
 
 # 安装构建依赖
-# sed -i 's|deb.debian.org|mirrors.ustc.edu.cn|g' /etc/apt/sources.list.d/debian.sources && \
 RUN apt-get update && \
     apt-get full-upgrade -y && \
     apt-get install -y \
@@ -70,11 +68,7 @@ RUN case "${TARGETARCH}" in \
     rm -f /tmp/s6-overlay.tar.xz
 
 # 获取并编译 Nginx
-RUN case "${COMPATIBLE}" in \
-    v3) CC_OPT="-O2 -march=native" ;; \
-    *) CC_OPT="-O2" ;; \
-    esac && \
-    git clone --single-branch --branch release-${NGINX_VERSION} https://github.com/nginx/nginx.git ${NGINX_SOURCE} && \
+RUN git clone --single-branch --branch release-${NGINX_VERSION} https://github.com/nginx/nginx.git ${NGINX_SOURCE} && \
     cd ${NGINX_SOURCE} && \
     ./auto/configure \
     --prefix=/etc/nginx \
@@ -108,7 +102,7 @@ RUN case "${COMPATIBLE}" in \
     --with-stream_ssl_module \
     --with-stream_ssl_preread_module \
     --with-threads \
-    --with-cc-opt="$CC_OPT" \
+    --with-cc-opt="-O2 -fPIC -D_FORTIFY_SOURCE=2" \
     --with-ld-opt="-Wl,-O1,--as-needed" \
     --add-module=${BROTLI_SOURCE} \
     --add-module=${NGINX_DAV_SOURCE} && \
@@ -122,7 +116,6 @@ FROM debian:stable-slim
 ENV PATH=/command:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 
 # 安装运行 Nginx 所需的最小依赖
-# sed -i 's|deb.debian.org|mirrors.ustc.edu.cn|g' /etc/apt/sources.list.d/debian.sources && \
 RUN apt-get update && \
     apt-get full-upgrade -y && \
     apt-get install -y --no-install-recommends cron libbrotli1 libxml2 && \
