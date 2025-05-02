@@ -10,7 +10,7 @@ ARG NGINX_VERSION=1.28.0
 ARG BORINGSSL_VERSION=0.20250415.0
 ARG S6_OVERLAY_VERSION=3.2.0.2
 ARG COMPATIBLE
-ARG TARGETARCH
+ARG S6_ARCH
 
 # 安装构建依赖
 # sed -i 's|deb.debian.org|mirrors.ustc.edu.cn|g' /etc/apt/sources.list.d/debian.sources && \
@@ -34,19 +34,6 @@ RUN apt-get update && \
     zlib1g-dev && \
     rm -rf /var/lib/apt/lists/*
 
-RUN mkdir -p /s6-overlay && \
-    case "${TARGETARCH}" in \
-    amd64) S6_ARCH=x86_64 ;; \
-    arm64) S6_ARCH=aarch64 ;; \
-    *) echo "Unsupported arch ${TARGETARCH}" >&2; exit 1 ;; \
-    esac && \
-    wget -O /tmp/s6-overlay-noarch.tar.xz https://github.com/just-containers/s6-overlay/releases/download/v${S6_OVERLAY_VERSION}/s6-overlay-noarch.tar.xz && \
-    wget -O /tmp/s6-overlay.tar.xz https://github.com/just-containers/s6-overlay/releases/download/v${S6_OVERLAY_VERSION}/s6-overlay-${S6_ARCH}.tar.xz && \
-    tar -C /s6-overlay -Jxpf /tmp/s6-overlay-noarch.tar.xz && \
-    tar -C /s6-overlay -Jxpf /tmp/s6-overlay.tar.xz && \
-    rm -f /tmp/s6-overlay-noarch.tar.xz && \
-    rm -f /tmp/s6-overlay.tar.xz
-
 # 安装 BORINGSSL
 RUN git clone --single-branch --branch ${BORINGSSL_VERSION} https://github.com/google/boringssl.git ${BORINGSSL_SOURCE} && \
     cd ${BORINGSSL_SOURCE} && \
@@ -67,6 +54,15 @@ RUN git clone --single-branch https://github.com/google/ngx_brotli.git ${BROTLI_
 
 # 安装 Dav extension
 RUN git clone --single-branch https://github.com/arut/nginx-dav-ext-module.git ${NGINX_DAV_SOURCE}
+
+# 安装 S6-Overlay
+RUN mkdir -p /s6-overlay && \
+    wget -O /tmp/s6-overlay-noarch.tar.xz https://github.com/just-containers/s6-overlay/releases/download/v${S6_OVERLAY_VERSION}/s6-overlay-noarch.tar.xz && \
+    wget -O /tmp/s6-overlay.tar.xz https://github.com/just-containers/s6-overlay/releases/download/v${S6_OVERLAY_VERSION}/s6-overlay-${S6_ARCH}.tar.xz && \
+    tar -C /s6-overlay -Jxpf /tmp/s6-overlay-noarch.tar.xz && \
+    tar -C /s6-overlay -Jxpf /tmp/s6-overlay.tar.xz && \
+    rm -f /tmp/s6-overlay-noarch.tar.xz && \
+    rm -f /tmp/s6-overlay.tar.xz
 
 # 获取并编译 Nginx
 RUN if [ "$COMPATIBLE" = "v3" ];then CC_OPT="-O2 -march=native"; else CC_OPT="-O2"; fi && \
@@ -127,15 +123,6 @@ RUN apt-get update && \
 # 设置工作目录
 WORKDIR /app
 
-# 安装 S6-Overlay
-COPY --from=builder /s6-overlay/ /
-
-# 从构建阶段复制编译好的 Nginx 文件
-COPY --from=builder /etc/nginx /etc/nginx
-COPY --from=builder /usr/sbin/nginx /usr/sbin/nginx
-COPY --from=builder /usr/lib/libssl.so /usr/lib/libssl.so
-COPY --from=builder /usr/lib/libcrypto.so /usr/lib/libcrypto.so
-
 # 创建 Nginx 用户和组并调整 Nginx 目录权限
 RUN groupadd -g 1000 nginx && \
     useradd -u 1000 -g nginx -s /sbin/nologin nginx && \
@@ -144,8 +131,16 @@ RUN groupadd -g 1000 nginx && \
     mkdir -p /var/cache/nginx && \
     chown -R nginx:nginx /var/cache/nginx && \
     mkdir -p /var/www/html && \
-    chown -R nginx:nginx /var/www/html && \
-    mkdir -p /run/service
+    chown -R nginx:nginx /var/www/html
+
+# 安装 S6-Overlay
+COPY --from=builder /s6-overlay/ /
+
+# 从构建阶段复制编译好的 Nginx 文件
+COPY --from=builder /etc/nginx /etc/nginx
+COPY --from=builder /usr/sbin/nginx /usr/sbin/nginx
+COPY --from=builder /usr/lib/libssl.so /usr/lib/libssl.so
+COPY --from=builder /usr/lib/libcrypto.so /usr/lib/libcrypto.so
 
 # 创建服务配置
 RUN touch /etc/s6-overlay/s6-rc.d/user/contents.d/check && \

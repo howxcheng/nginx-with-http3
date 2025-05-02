@@ -33,20 +33,54 @@ jobs:
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_PASSWORD }}
 
-      - name: Build and Push Docker image
-        run: |
-          # 设置镜像名称
-          IMAGE_NAME=howxcheng/nginx-with-http3
+      - name: Build and Push Docker image for AMD64v3 CPU
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          platforms: linux/amd64
+          tags: howxcheng/nginx-with-http3:latest
+          build-args: |
+            COMPATIBLE=v3
+            S6_ARCH=x86_64
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
 
-          # 构建镜像并推送
-          docker buildx build \
-            --platform linux/amd64,linux/arm64 \
-            --build-arg COMPATIBLE=v3 \
-            -t $IMAGE_NAME:latest \
-            --push .
+      - name: Build and Push Docker image for AMD64v2 CPU
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          platforms: linux/amd64,linux/arm64
+          tags: howxcheng/nginx-with-http3:compatible
+          build-args: |
+            COMPATIBLE=v2
+            S6_ARCH=x86_64
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
 
-          docker buildx build \
-            --platform linux/amd64,linux/arm64 \
-            --build-arg COMPATIBLE=v2 \
-            -t $IMAGE_NAME:compatible \
-            --push .
+      - name: Build and Push Docker image for ARM64v3 CPU
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          platforms: linux/arm64
+          tags: howxcheng/nginx-with-http3:latest
+          build-args: |
+            COMPATIBLE=v3
+            S6_ARCH=aarch64
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Build and Push Docker image for ARM64v2 CPU
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          platforms: linux/amd64,linux/arm64
+          tags: howxcheng/nginx-with-http3:compatible
+          build-args: |
+            COMPATIBLE=v2
+            S6_ARCH=aarch64
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
