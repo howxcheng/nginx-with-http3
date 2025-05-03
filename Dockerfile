@@ -3,11 +3,11 @@ FROM debian:stable-slim AS builder
 
 # 设置构建环境变量
 ENV NGINX_SOURCE=/usr/src/nginx
-ENV BORINGSSL_SOURCE=/usr/src/boringssl
+ENV OPENSSL_SOURCE=/usr/src/openssl
 ENV BROTLI_SOURCE=/usr/src/ngx_brotli
 ENV NGINX_DAV_SOURCE=/usr/src/nginx-dav-ext-module
 ENV NGINX_VERSION=1.28.0
-ENV BORINGSSL_VERSION=0.20250415.0
+ENV OPENSSL_VERSION=3.5.0
 ENV S6_OVERLAY_VERSION=3.2.0.2
 ARG TARGETARCH 
 
@@ -16,15 +16,9 @@ RUN apt-get update && \
     apt-get full-upgrade -y && \
     apt-get install -y \
     build-essential \
-    cmake \
-    clang \
-    llvm \
-    ninja-build \
     git \
-    golang \
     libpcre2-dev \
     libbrotli-dev \
-    libunwind-dev \
     libxml2-dev \
     libxslt1-dev \
     xz-utils \
@@ -32,19 +26,8 @@ RUN apt-get update && \
     zlib1g-dev && \
     rm -rf /var/lib/apt/lists/*
 
-# 安装 BORINGSSL
-RUN git clone --single-branch --branch ${BORINGSSL_VERSION} https://github.com/google/boringssl.git ${BORINGSSL_SOURCE} && \
-    cd ${BORINGSSL_SOURCE} && \
-    cmake -GNinja \
-    -B build \
-    -DCMAKE_BUILD_TYPE=Release \
-    -DBUILD_SHARED_LIBS=ON \
-    -DCMAKE_C_COMPILER=clang \
-    -DCMAKE_CXX_COMPILER=clang++ && \
-    ninja -C build && \
-    cp ${BORINGSSL_SOURCE}/build/crypto/libcrypto.so /usr/lib/ && \
-    cp ${BORINGSSL_SOURCE}/build/ssl/libssl.so /usr/lib/ && \
-    cp -r ${BORINGSSL_SOURCE}/include/openssl /usr/include/openssl
+# 安装 OpenSSL
+RUN git clone --single-branch --branch openssl-${OPENSSL_VERSION} https://github.com/openssl/openssl.git ${OPENSSL_SOURCE}
 
 # 安装 Brotli
 RUN git clone --single-branch https://github.com/google/ngx_brotli.git ${BROTLI_SOURCE} && \
@@ -104,6 +87,7 @@ RUN git clone --single-branch --branch release-${NGINX_VERSION} https://github.c
     --with-threads \
     --with-cc-opt="-O2 -fPIC -D_FORTIFY_SOURCE=2" \
     --with-ld-opt="-Wl,-O1,--as-needed" \
+    --with-openssl=${OPENSSL_SOURCE} \
     --add-module=${BROTLI_SOURCE} \
     --add-module=${NGINX_DAV_SOURCE} && \
     make -j$(nproc) && \
@@ -140,8 +124,6 @@ COPY --from=builder /s6-overlay/ /
 # 从构建阶段复制编译好的 Nginx 文件
 COPY --from=builder /etc/nginx /etc/nginx
 COPY --from=builder /usr/sbin/nginx /usr/sbin/nginx
-COPY --from=builder /usr/lib/libssl.so /usr/lib/libssl.so
-COPY --from=builder /usr/lib/libcrypto.so /usr/lib/libcrypto.so
 
 # 创建服务配置
 RUN touch /etc/s6-overlay/s6-rc.d/user/contents.d/check && \
