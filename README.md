@@ -1,10 +1,5 @@
-## 项目地址： [github.com/howxcheng/nginx-with-http3](url:https://github.com/howxcheng/nginx-with-http3)
+## 镜像地址： [howxcheng/nginx-with-http3:latest](https://hub.docker.com/r/howxcheng/nginx-with-http3)
 
-```
-latest:  默认镜像
-
-compatible:  不支持AVX2、SSE4等功能的旧型号(V2以下)的CPU
-```
 ## 示例配置
 
 ### docker-compose.yaml 示例配置
