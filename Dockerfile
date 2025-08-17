@@ -5,7 +5,6 @@ FROM debian:stable-slim AS builder
 ENV NGINX_SOURCE=/usr/src/nginx
 ENV OPENSSL_SOURCE=/usr/src/openssl
 ENV BROTLI_SOURCE=/usr/src/ngx_brotli
-ENV ZSTD_SOURCE=/usr/src/ngx_zstd
 ENV NGINX_DAV_SOURCE=/usr/src/ngx_dav_ext
 ENV NGINX_VERSION=1.29.1
 ENV OPENSSL_VERSION=3.5.2
@@ -22,7 +21,6 @@ RUN apt-get update && \
     libbrotli-dev \
     libxml2-dev \
     libxslt1-dev \
-    libzstd-dev \
     xz-utils \
     wget \
     zlib1g-dev && \
@@ -34,9 +32,6 @@ RUN git clone --single-branch --branch openssl-${OPENSSL_VERSION} https://github
 # 安装 Brotli
 RUN git clone --single-branch https://github.com/google/ngx_brotli.git ${BROTLI_SOURCE} && \
     git clone --single-branch https://github.com/google/brotli.git ${BROTLI_SOURCE}/deps/brotli
-
-# 安装 zstd
-RUN git clone --single-branch https://github.com/tokers/zstd-nginx-module.git ${ZSTD_SOURCE}
 
 # 安装 Dav extension
 RUN git clone --single-branch https://github.com/arut/nginx-dav-ext-module.git ${NGINX_DAV_SOURCE}
@@ -93,7 +88,6 @@ RUN git clone --single-branch --branch release-${NGINX_VERSION} https://github.c
     --with-ld-opt="-Wl,-O1,--as-needed" \
     --with-openssl=${OPENSSL_SOURCE} \
     --add-module=${BROTLI_SOURCE} \
-    --add-module=${ZSTD_SOURCE} \
     --add-module=${NGINX_DAV_SOURCE} && \
     make -j$(nproc) && \
     make install
