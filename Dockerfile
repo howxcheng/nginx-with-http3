@@ -8,7 +8,7 @@ ENV BROTLI_SOURCE=/usr/src/ngx_brotli
 ENV NGINX_DAV_SOURCE=/usr/src/ngx_dav_ext
 ENV NGINX_VERSION=1.29.1
 ENV OPENSSL_VERSION=3.5.2
-ENV S6_OVERLAY_VERSION=3.2.1.0
+# ENV S6_OVERLAY_VERSION=3.2.1.0
 ARG TARGETARCH 
 
 # 安装构建依赖
@@ -27,31 +27,30 @@ RUN apt-get update && \
     rm -rf /var/lib/apt/lists/*
 
 # 安装 OpenSSL
-RUN git clone --single-branch --branch openssl-${OPENSSL_VERSION} https://github.com/openssl/openssl.git ${OPENSSL_SOURCE}
+RUN git clone --branch openssl-${OPENSSL_VERSION} https://github.com/openssl/openssl.git ${OPENSSL_SOURCE}
 
 # 安装 Brotli
-RUN git clone --single-branch https://github.com/google/ngx_brotli.git ${BROTLI_SOURCE} && \
-    git clone --single-branch https://github.com/google/brotli.git ${BROTLI_SOURCE}/deps/brotli
+RUN git clone --recurse-submodules https://github.com/google/ngx_brotli.git ${BROTLI_SOURCE}
 
 # 安装 Dav extension
-RUN git clone --single-branch https://github.com/arut/nginx-dav-ext-module.git ${NGINX_DAV_SOURCE}
+RUN git clone https://github.com/arut/nginx-dav-ext-module.git ${NGINX_DAV_SOURCE}
 
 # 安装 S6-Overlay
-RUN case "${TARGETARCH}" in \
-    amd64) S6_ARCH=x86_64 ;; \
-    arm64) S6_ARCH=aarch64 ;; \
-    *) echo "Unsupported arch ${TARGETARCH}" >&2; exit 1 ;; \
-    esac && \
-    mkdir -p /s6-overlay && \
-    wget -O /tmp/s6-overlay-noarch.tar.xz https://github.com/just-containers/s6-overlay/releases/download/v${S6_OVERLAY_VERSION}/s6-overlay-noarch.tar.xz && \
-    wget -O /tmp/s6-overlay.tar.xz https://github.com/just-containers/s6-overlay/releases/download/v${S6_OVERLAY_VERSION}/s6-overlay-${S6_ARCH}.tar.xz && \
-    tar -C /s6-overlay -Jxpf /tmp/s6-overlay-noarch.tar.xz && \
-    tar -C /s6-overlay -Jxpf /tmp/s6-overlay.tar.xz && \
-    rm -f /tmp/s6-overlay-noarch.tar.xz && \
-    rm -f /tmp/s6-overlay.tar.xz
+# RUN case "${TARGETARCH}" in \
+#     amd64) S6_ARCH=x86_64 ;; \
+#     arm64) S6_ARCH=aarch64 ;; \
+#     *) echo "Unsupported arch ${TARGETARCH}" >&2; exit 1 ;; \
+#     esac && \
+#     mkdir -p /s6-overlay && \
+#     wget -O /tmp/s6-overlay-noarch.tar.xz https://github.com/just-containers/s6-overlay/releases/download/v${S6_OVERLAY_VERSION}/s6-overlay-noarch.tar.xz && \
+#     wget -O /tmp/s6-overlay.tar.xz https://github.com/just-containers/s6-overlay/releases/download/v${S6_OVERLAY_VERSION}/s6-overlay-${S6_ARCH}.tar.xz && \
+#     tar -C /s6-overlay -Jxpf /tmp/s6-overlay-noarch.tar.xz && \
+#     tar -C /s6-overlay -Jxpf /tmp/s6-overlay.tar.xz && \
+#     rm -f /tmp/s6-overlay-noarch.tar.xz && \
+#     rm -f /tmp/s6-overlay.tar.xz
 
 # 获取并编译 Nginx
-RUN git clone --single-branch --branch release-${NGINX_VERSION} https://github.com/nginx/nginx.git ${NGINX_SOURCE} && \
+RUN git clone --branch release-${NGINX_VERSION} https://github.com/nginx/nginx.git ${NGINX_SOURCE} && \
     cd ${NGINX_SOURCE} && \
     ./auto/configure \
     --prefix=/etc/nginx \
@@ -101,7 +100,7 @@ ENV PATH=/command:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 # 安装运行 Nginx 所需的最小依赖
 RUN apt-get update && \
     apt-get full-upgrade -y && \
-    apt-get install -y --no-install-recommends cron libbrotli1 libxml2 && \
+    apt-get install -y --no-install-recommends libbrotli1 libxml2 && \
     rm -rf /var/lib/apt/lists/*
 
 # 设置工作目录
@@ -118,19 +117,20 @@ RUN groupadd -g 1000 nginx && \
     chown -R nginx:nginx /var/www/html
 
 # 安装 S6-Overlay
-COPY --from=builder /s6-overlay/ /
+# COPY --from=builder /s6-overlay/ /
 
 # 从构建阶段复制编译好的 Nginx 文件
 COPY --from=builder /etc/nginx /etc/nginx
 COPY --from=builder /usr/sbin/nginx /usr/sbin/nginx
 
 # 创建服务配置
-RUN touch /etc/s6-overlay/s6-rc.d/user/contents.d/check && \
-    touch /etc/s6-overlay/s6-rc.d/user/contents.d/nginx && \
-    touch /etc/s6-overlay/s6-rc.d/user/contents.d/cron
-COPY s6-rc.d/ /etc/s6-overlay/s6-rc.d/
+# RUN touch /etc/s6-overlay/s6-rc.d/user/contents.d/check && \
+#     touch /etc/s6-overlay/s6-rc.d/user/contents.d/nginx && \
+#     touch /etc/s6-overlay/s6-rc.d/user/contents.d/cron
+# COPY s6-rc.d/ /etc/s6-overlay/s6-rc.d/
 
 # 暴露端口
 EXPOSE 80 443
 
-ENTRYPOINT [ "/init" ]
+CMD ["nginx", "-g", "daemon off;"]
+# ENTRYPOINT [ "/init" ]
