@@ -3,11 +3,11 @@ FROM debian:stable-slim AS builder
 
 # 设置构建环境变量
 ENV NGINX_SOURCE=/usr/src/nginx
-ENV OPENSSL_SOURCE=/usr/src/openssl
+ENV BORINGSSL_SOURCE=/usr/src/boringssl
 ENV BROTLI_SOURCE=/usr/src/ngx_brotli
 ENV NGINX_DAV_SOURCE=/usr/src/ngx_dav_ext
 ENV NGINX_VERSION=1.29.1
-ENV OPENSSL_VERSION=3.5.2
+ENV BORINGSSL_VERSION=0.20250818.0
 # ENV S6_OVERLAY_VERSION=3.2.1.0
 ARG TARGETARCH 
 
@@ -16,18 +16,26 @@ RUN apt-get update && \
     apt-get full-upgrade -y && \
     apt-get install -y \
     build-essential \
+    cmake \
     git \
     libpcre2-dev \
     libbrotli-dev \
     libxml2-dev \
     libxslt1-dev \
+    ninja-build \
     xz-utils \
     wget \
     zlib1g-dev && \
     rm -rf /var/lib/apt/lists/*
 
-# 安装 OpenSSL
-RUN git clone --branch openssl-${OPENSSL_VERSION} https://github.com/openssl/openssl.git ${OPENSSL_SOURCE}
+# 安装 BoringSSL
+RUN git clone --branch ${BORINGSSL_VERSION} https://github.com/google/boringssl.git ${BORINGSSL_SOURCE} && \
+    cd ${BORINGSSL_SOURCE} && \
+    cmake -GNinja -B build -DCMAKE_BUILD_TYPE=Release && \
+    ninja -C build && \
+    mkdir -p lib && \
+    ln -s $(realpath build/libssl.a) $(realpath lib/libssl.a) && \
+    ln -s $(realpath build/libcrypto.a) $(realpath lib/libcrypto.a)
 
 # 安装 Brotli
 RUN git clone --recurse-submodules https://github.com/google/ngx_brotli.git ${BROTLI_SOURCE}
@@ -83,9 +91,8 @@ RUN git clone --branch release-${NGINX_VERSION} https://github.com/nginx/nginx.g
     --with-stream_ssl_module \
     --with-stream_ssl_preread_module \
     --with-threads \
-    --with-cc-opt="-O2 -fPIC -D_FORTIFY_SOURCE=2" \
-    --with-ld-opt="-Wl,-O1,--as-needed" \
-    --with-openssl=${OPENSSL_SOURCE} \
+    --with-cc-opt="-I../boringssl/include -O2 -fPIC -D_FORTIFY_SOURCE=2" \
+    --with-ld-opt="-L../boringssl/lib -lssl -lcrypto -lstdc++ -Wl,-O1,--as-needed" \
     --add-module=${BROTLI_SOURCE} \
     --add-module=${NGINX_DAV_SOURCE} && \
     make -j$(nproc) && \
