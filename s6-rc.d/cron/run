@@ -1,4 +1,0 @@
-#!/command/execlineb -P
-
-with-contenv
-cron -f -L /proc/1/fd/1

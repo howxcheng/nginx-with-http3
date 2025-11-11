@@ -1,3 +1,0 @@
-#!/command/execlineb -c
-
-/bin/sh /etc/s6-overlay/s6-rc.d/check/check.sh
