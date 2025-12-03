@@ -38,8 +38,8 @@ jobs:
         uses: docker/build-push-action@v6
         with:
           context: .
-          platforms: linux/amd64
-          # platforms: linux/amd64, linux/arm64
+          # platforms: linux/amd64
+          platforms: linux/amd64, linux/arm64
           push: true
           tags: howxcheng/nginx-with-http3:latest
           # cache-from: type=gha,scope=nginx-with-http3
